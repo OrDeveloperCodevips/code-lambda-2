@@ -75,14 +75,6 @@ jobs:
             --function-name "$FUNCTION_NAME" \
             --zip-file fileb://function.zip \
             --region "$AWS_REGION"
-          
-          aws lambda update-function-configuration \
-            --function-name "$FUNCTION_NAME" \
-            --runtime "$LAMBDA_RUNTIME" \
-            --role "$LAMBDA_ROLE_ARN" \
-            --handler "$LAMBDA_HANDLER" \
-            --timeout "$LAMBDA_TIMEOUT" \
-            --region "$AWS_REGION"
 
         else
           echo "⚠️ La función no existe, creando..."
