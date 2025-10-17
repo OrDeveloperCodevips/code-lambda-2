@@ -1,0 +1,10 @@
+{
+  "name": "lambda-dev-sample",
+  "version": "1.0.0",
+  "description": "Lambda simple ejemplo",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"No tests yet\" && exit 0"
+  },
+  "dependencies": {}
+}
