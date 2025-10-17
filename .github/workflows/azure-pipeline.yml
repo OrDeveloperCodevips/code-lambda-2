@@ -74,8 +74,18 @@ jobs:
           aws lambda update-function-code \
             --function-name "$FUNCTION_NAME" \
             --zip-file fileb://function.zip \
-            --timeout "$LAMBDA_TIMEOUT" \
             --region "$AWS_REGION"
+          
+          echo "Actualizando configuración (sin importar si cambió)..."
+          aws lambda update-function-configuration \
+            --function-name "$FUNCTION_NAME" \
+            --runtime "$LAMBDA_RUNTIME" \
+            --role "$LAMBDA_ROLE_ARN" \
+            --handler "$LAMBDA_HANDLER" \
+            --timeout "$LAMBDA_TIMEOUT" \
+            --memory-size "$LAMBDA_MEMORY" \
+            --region "$AWS_REGION"
+
         else
           echo "⚠️ La función no existe, creando..."
           aws lambda create-function \
@@ -124,7 +134,6 @@ jobs:
   #         aws lambda update-function-code \
   #           --function-name "$FUNCTION_NAME" \
   #           --zip-file fileb://function.zip \
-  #           --timeout "$LAMBDA_TIMEOUT" \
   #           --region "$AWS_REGION"
   #       else
   #         echo "⚠️ La función no existe, creando..."
@@ -174,7 +183,6 @@ jobs:
   #         aws lambda update-function-code \
   #           --function-name "$FUNCTION_NAME" \
   #           --zip-file fileb://function.zip \
-  #           --timeout "$LAMBDA_TIMEOUT" \
   #           --region "$AWS_REGION"
   #       else
   #         echo "⚠️ La función no existe, creando..."
