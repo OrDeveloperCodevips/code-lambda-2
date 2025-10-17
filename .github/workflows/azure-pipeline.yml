@@ -1,0 +1,189 @@
+name: CI/CD Lambda
+
+on:
+  push:
+    branches:
+      - main
+      - qa
+      - master
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout código
+      uses: actions/checkout@v3
+
+    - name: Configurar Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '16'
+
+    - name: Instalar dependencias
+      run: npm install
+
+    - name: Empaquetar código
+      run: |
+        if [ ! -f index.js ]; then
+          echo "ERROR: No se encontró index.js"
+          exit 1
+        fi
+        zip -r function.zip index.js
+
+    - name: Guardar artifact empaquetado
+      uses: actions/upload-artifact@v3
+      with:
+        name: lambda-package
+        path: function.zip
+
+  deploy_dev:
+    name: Deploy Dev
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    environment: dev
+
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION_DEV }}
+      FUNCTION_NAME: ${{ vars.FUNCTION_NAME_DEV }}
+      LAMBDA_RUNTIME: ${{ vars.LAMBDA_RUNTIME_DEV }}
+      LAMBDA_HANDLER: ${{ vars.LAMBDA_HANDLER_DEV }}
+      LAMBDA_ROLE_ARN: ${{ vars.LAMBDA_ROLE_ARN_DEV }}
+      LAMBDA_TIMEOUT: ${{ vars.LAMBDA_TIMEOUT_DEV }}
+
+    steps:
+    - name: Descargar artifact empaquetado
+      uses: actions/download-artifact@v3
+      with:
+        name: lambda-package
+
+    - name: Configurar credenciales AWS
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Crear o actualizar función Lambda (Dev)
+      run: |
+        echo "Verificando si existe la función: $FUNCTION_NAME"
+        if aws lambda get-function --function-name "$FUNCTION_NAME" --region "$AWS_REGION" > /dev/null 2>&1; then
+          echo "✅ La función existe, actualizando código..."
+          aws lambda update-function-code \
+            --function-name "$FUNCTION_NAME" \
+            --zip-file fileb://function.zip \
+            --timeout "$LAMBDA_TIMEOUT" \
+            --region "$AWS_REGION"
+        else
+          echo "⚠️ La función no existe, creando..."
+          aws lambda create-function \
+            --function-name "$FUNCTION_NAME" \
+            --runtime "$LAMBDA_RUNTIME" \
+            --role "$LAMBDA_ROLE_ARN" \
+            --handler "$LAMBDA_HANDLER" \
+            --zip-file fileb://function.zip \
+            --timeout "$LAMBDA_TIMEOUT" \
+            --region "$AWS_REGION"
+        fi
+
+  # deploy_qa:
+  #   name: Deploy QA
+  #   runs-on: ubuntu-latest
+  #   needs: build
+  #   if: github.ref == 'refs/heads/qa'
+  #   environment: qa
+
+  #   env:
+  #     AWS_REGION: ${{ vars.AWS_REGION_QA }}
+  #     FUNCTION_NAME: ${{ vars.FUNCTION_NAME_QA }}
+  #     LAMBDA_RUNTIME: ${{ vars.LAMBDA_RUNTIME_QA }}
+  #     LAMBDA_HANDLER: ${{ vars.LAMBDA_HANDLER_QA }}
+  #     LAMBDA_ROLE_ARN: ${{ vars.LAMBDA_ROLE_ARN_QA }}
+  #     LAMBDA_TIMEOUT: ${{ vars.LAMBDA_TIMEOUT_QA }}
+
+  #   steps:
+  #   - name: Descargar artifact empaquetado
+  #     uses: actions/download-artifact@v3
+  #     with:
+  #       name: lambda-package
+
+  #   - name: Configurar credenciales AWS
+  #     uses: aws-actions/configure-aws-credentials@v2
+  #     with:
+  #       aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  #       aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  #       aws-region: ${{ env.AWS_REGION }}
+
+  #   - name: Crear o actualizar función Lambda (QA)
+  #     run: |
+  #       echo "Verificando si existe la función: $FUNCTION_NAME"
+  #       if aws lambda get-function --function-name "$FUNCTION_NAME" --region "$AWS_REGION" > /dev/null 2>&1; then
+  #         echo "✅ La función existe, actualizando código..."
+  #         aws lambda update-function-code \
+  #           --function-name "$FUNCTION_NAME" \
+  #           --zip-file fileb://function.zip \
+  #           --timeout "$LAMBDA_TIMEOUT" \
+  #           --region "$AWS_REGION"
+  #       else
+  #         echo "⚠️ La función no existe, creando..."
+  #         aws lambda create-function \
+  #           --function-name "$FUNCTION_NAME" \
+  #           --runtime "$LAMBDA_RUNTIME" \
+  #           --role "$LAMBDA_ROLE_ARN" \
+  #           --handler "$LAMBDA_HANDLER" \
+  #           --zip-file fileb://function.zip \
+  #           --timeout "$LAMBDA_TIMEOUT" \
+  #           --region "$AWS_REGION"
+  #       fi
+
+  # deploy_prd:
+  #   name: Deploy Production
+  #   runs-on: ubuntu-latest
+  #   needs: build
+  #   if: github.ref == 'refs/heads/master'
+  #   environment: production
+
+  #   env:
+  #     AWS_REGION: ${{ vars.AWS_REGION_PRD }}
+  #     FUNCTION_NAME: ${{ vars.FUNCTION_NAME_PRD }}
+  #     LAMBDA_RUNTIME: ${{ vars.LAMBDA_RUNTIME_PRD }}
+  #     LAMBDA_HANDLER: ${{ vars.LAMBDA_HANDLER_PRD }}
+  #     LAMBDA_ROLE_ARN: ${{ vars.LAMBDA_ROLE_ARN_PRD }}
+  #     LAMBDA_TIMEOUT: ${{ vars.LAMBDA_TIMEOUT_PRD }}
+
+  #   steps:
+  #   - name: Descargar artifact empaquetado
+  #     uses: actions/download-artifact@v3
+  #     with:
+  #       name: lambda-package
+
+  #   - name: Configurar credenciales AWS
+  #     uses: aws-actions/configure-aws-credentials@v2
+  #     with:
+  #       aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  #       aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  #       aws-region: ${{ env.AWS_REGION }}
+
+  #   - name: Crear o actualizar función Lambda (Production)
+  #     run: |
+  #       echo "Verificando si existe la función: $FUNCTION_NAME"
+  #       if aws lambda get-function --function-name "$FUNCTION_NAME" --region "$AWS_REGION" > /dev/null 2>&1; then
+  #         echo "✅ La función existe, actualizando código..."
+  #         aws lambda update-function-code \
+  #           --function-name "$FUNCTION_NAME" \
+  #           --zip-file fileb://function.zip \
+  #           --timeout "$LAMBDA_TIMEOUT" \
+  #           --region "$AWS_REGION"
+  #       else
+  #         echo "⚠️ La función no existe, creando..."
+  #         aws lambda create-function \
+  #           --function-name "$FUNCTION_NAME" \
+  #           --runtime "$LAMBDA_RUNTIME" \
+  #           --role "$LAMBDA_ROLE_ARN" \
+  #           --handler "$LAMBDA_HANDLER" \
+  #           --zip-file fileb://function.zip \
+  #           --timeout "$LAMBDA_TIMEOUT" \
+  #           --region "$AWS_REGION"
+  #       fi
